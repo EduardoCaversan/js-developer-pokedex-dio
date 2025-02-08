@@ -1,9 +1,11 @@
-const pokemonList = document.getElementById('pokemonList')
-const loadMoreButton = document.getElementById('loadMoreButton')
+const pokemonList = document.getElementById('pokemonList');
+const loadMoreButton = document.getElementById('loadMoreButton');
+const loaderSection = document.getElementById('loader-section');
 
-const maxRecords = 151
-const limit = 10
+const maxRecords = 600;
+const limit = 30;
 let offset = 0;
+let isLoading = false;
 
 function convertPokemonToLi(pokemon) {
     return `
@@ -16,32 +18,58 @@ function convertPokemonToLi(pokemon) {
                     ${pokemon.types.map((type) => `<li class="type ${type}">${type}</li>`).join('')}
                 </ol>
 
-                <img src="${pokemon.photo}"
-                     alt="${pokemon.name}">
+                <img src="${pokemon.photo}" alt="${pokemon.name}">
             </div>
         </li>
-    `
+    `;
 }
 
 function loadPokemonItens(offset, limit) {
-    pokeApi.getPokemons(offset, limit).then((pokemons = []) => {
-        const newHtml = pokemons.map(convertPokemonToLi).join('')
-        pokemonList.innerHTML += newHtml
-    })
+    return new Promise((resolve) => {
+        pokeApi.getPokemons(offset, limit).then((pokemons = []) => {
+            if (pokemons.length > 0) {
+                const newHtml = pokemons.map(pokemon => convertPokemonToLi(pokemon)).join('');
+                pokemonList.innerHTML += newHtml;
+            }
+            setTimeout(() => {
+                resolve();
+            }, 500)
+        });
+    });
 }
 
-loadPokemonItens(offset, limit)
+loadPokemonItens(offset, limit);
 
-loadMoreButton.addEventListener('click', () => {
-    offset += limit
-    const qtdRecordsWithNexPage = offset + limit
+function startLoading() {
+    isLoading = true;
+    loaderSection.style.display = 'flex';
+}
 
-    if (qtdRecordsWithNexPage >= maxRecords) {
-        const newLimit = maxRecords - offset
-        loadPokemonItens(offset, newLimit)
+function stopLoading() {
+    isLoading = false;
+    loaderSection.style.display = 'none';
+}
 
-        loadMoreButton.parentElement.removeChild(loadMoreButton)
-    } else {
-        loadPokemonItens(offset, limit)
+function debounce(fn, delay) {
+    let timer;
+    return function (...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), delay);
+    };
+}
+
+window.addEventListener("scroll", debounce(() => {
+    if (window.innerHeight + window.scrollY >= document.body.offsetHeight && !isLoading) {
+        startLoading();
+
+        offset += limit;
+        const qtdRecordsWithNextPage = offset + limit;
+
+        if (qtdRecordsWithNextPage >= maxRecords) {
+            const newLimit = maxRecords - offset;
+            loadPokemonItens(offset, newLimit).then(stopLoading);
+        } else {
+            loadPokemonItens(offset, limit).then(stopLoading);
+        }
     }
-})
+}, 200));
